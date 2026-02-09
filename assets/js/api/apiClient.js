@@ -41,7 +41,9 @@ function clearSessionAndRedirect() {
 async function parseErrorResponse(res) {
   let body;
   try {
-    body = await res.json();
+    const text = await res.text();
+    if (!text) return { message: res.statusText || 'Error de conexión' };
+    body = JSON.parse(text);
   } catch {
     return { message: res.statusText || 'Error de conexión' };
   }
@@ -51,6 +53,15 @@ async function parseErrorResponse(res) {
     return { message: Array.isArray(first) ? first[0] : first, errors: body.errors };
   }
   return { message: body.error || 'Error en la solicitud' };
+}
+
+async function parseJsonSafe(res) {
+  if (res.status === 204) return null;
+  const contentLength = res.headers.get('Content-Length');
+  if (contentLength === '0') return null;
+  const text = await res.text();
+  if (!text) return null;
+  return JSON.parse(text);
 }
 
 /**
@@ -79,8 +90,7 @@ async function apiFetch(path, options = {}, retried = false) {
     const err = await parseErrorResponse(res);
     throw new Error(err.message || `Error ${res.status}`);
   }
-  if (res.status === 204) return null;
-  return res.json();
+ return parseJsonSafe(res);
 }
 
 function apiGet(path) {
